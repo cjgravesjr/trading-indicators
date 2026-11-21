@@ -8,8 +8,9 @@ Pine Script (TradingView) indicators and companion tools built and iterated by C
 
 | Folder / file | What it is |
 |---|---|
-| `liquidity-radar/MBF_RZ_Liquidity_v0_6_12.pine` | **MBF & RZ Liquidity Radar v0.6.12** — maps where resting liquidity sits (swing highs/lows, session extremes, prior day/week, equal highs/lows), detects sweeps, reclaims and rejections with a bar-close state machine, and narrates the live "story" (WAIT / WATCH / LONG / SHORT / RUNNING / DONE) in a panel. Exports five bridge values that the ULTRA indicator reads. Pine v6, ~1,265 lines. |
-| `tools/` | Self-contained HTML tools built alongside the indicators (backtest lab, contract-size sheet, top-down game plan checklist, VWAP + stochastics explainer). |
+| `MBF_RZ_Liquidity_v0_6_12.pine` | **MBF & RZ Liquidity Radar v0.6.12** — maps where resting liquidity sits (swing highs/lows, session extremes, prior day/week, equal highs/lows), detects sweeps, reclaims and rejections with a bar-close state machine, and narrates the live "story" (WAIT / WATCH / LONG / SHORT / RUNNING / DONE) in a panel. Exports five bridge values that the ULTRA indicator reads. Pine v6, ~1,265 lines. |
+| `tools/vwap-stochastics.html` | Interactive explainer: the math behind VWAP (as a growing-time-constant low-pass filter) and stochastics, plus a simulated SPX session with volume-width candles you can scrub bar by bar and quiz yourself on. Pure canvas + JS, no libraries. |
+| `tools/contract-size.html` | Position-size sheet for SPX/SPXW options: all-in vs buffered vs profit-locked sizing across a strike-price ladder, with stop/take-profit math. Defaults are placeholders. |
 
 ## Liquidity Radar, in plain language
 
