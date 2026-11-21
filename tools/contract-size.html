@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Contract size sheet — all in vs buffers</title>
+<style>
+  :root{--bg:#0d1117;--card:#161b22;--line:#30363d;--txt:#e6edf3;--mut:#8b949e;--grn:#3fb950;--red:#f85149;--gold:#e3b341;--blue:#58a6ff;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font:600 18px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:20px}
+  h1{font-size:30px;margin:0 0 4px}
+  .sub{color:var(--mut);font-size:16px;margin-bottom:18px}
+  .inputs{display:flex;flex-wrap:wrap;gap:14px;margin-bottom:18px}
+  .inp{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 14px}
+  .inp label{display:block;color:var(--mut);font-size:14px}
+  .inp input{background:transparent;border:0;color:var(--txt);font:800 24px system-ui;width:130px;outline:none}
+  .summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-bottom:18px}
+  .box{background:var(--card);border:2px solid var(--line);border-radius:14px;padding:14px 16px}
+  .box h2{margin:0 0 6px;font-size:22px}
+  .box .big{font-size:34px;font-weight:900}
+  .allin{border-color:var(--red)} .allin h2{color:var(--red)}
+  .buf{border-color:var(--grn)} .buf h2{color:var(--grn)}
+  .lock{border-color:var(--blue)} .lock h2{color:var(--blue)} th.b{color:var(--blue)}
+  .road{margin-bottom:18px} .road table{min-width:600px} .road td{font-size:20px}
+  .rule{background:#1f1a0b;border:2px solid var(--gold);border-radius:14px;padding:12px 16px;margin-bottom:18px;font-size:17px}
+  .rule b{color:var(--gold)}
+  .wrap{overflow-x:auto;border:1px solid var(--line);border-radius:14px}
+  table{border-collapse:collapse;width:100%;min-width:1250px}
+  th,td{padding:9px 10px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+  th{position:sticky;top:0;background:#1c2330;font-size:14px;color:var(--mut)}
+  th.grp{font-size:17px;text-align:center}
+  th.r{color:var(--red)} th.g{color:var(--grn)}
+  td:first-child,th:first-child{text-align:left}
+  td.px{font-size:22px;font-weight:900}
+  td.n{font-size:22px;font-weight:900}
+  .sepL{border-left:3px solid var(--line)}
+  tr.plan{background:rgba(227,179,65,.12)}
+  tr.plan td.px{color:var(--gold)}
+  .neg{color:var(--red)} .pos{color:var(--grn)} .zero{color:var(--mut)}
+  .foot{color:var(--mut);font-size:14px;margin-top:14px}
+</style>
+</head>
+<body>
+<h1>Contract size sheet</h1>
+<div class="sub">SPX / SPXW options · 1 contract = price × 100 · change any box and the sheet updates</div>
+
+<div class="inputs">
+  <div class="inp"><label>Account balance ($)</label><input id="bal" type="number" step="0.01" value="2000"></div>
+  <div class="inp"><label>Buffer kept aside ($)</label><input id="buf" type="number" step="1" value="300"></div>
+  <div class="inp"><label>Locked premium ($)</label><input id="prem" type="number" step="1" value="1500"></div>
+  <div class="inp"><label>Stop (−%)</label><input id="stop" type="number" step="1" value="20"></div>
+  <div class="inp"><label>Take profit (+%)</label><input id="tp" type="number" step="1" value="50"></div>
+</div>
+
+<div class="summary">
+  <div class="box allin"><h2>ALL IN</h2><div>Trading money</div><div class="big" id="sA"></div></div>
+  <div class="box buf"><h2>$300 BUFFER</h2><div>Trading money</div><div class="big" id="sB"></div><div id="sB2" style="color:var(--mut)"></div></div>
+  <div class="box lock"><h2>PROFIT LOCKED</h2><div>Trading money (same premium every time)</div><div class="big" id="sC"></div><div id="sC2" style="color:var(--mut)"></div></div>
+</div>
+
+<div class="road wrap"><table>
+<thead><tr><th>Road to $10K from $2,000 (if every win is +46%)</th><th>Wins needed</th><th>What a −20% stop costs</th><th>Banked money at risk</th></tr></thead>
+<tbody>
+<tr><td style="color:var(--red)">ALL IN — everything rides</td><td class="n">5</td><td>Grows with the account ($400 now, ~$1,300 near $6.5K)</td><td class="neg">All of it</td></tr>
+<tr><td style="color:var(--grn)">$300 BUFFER — everything but $300 rides</td><td class="n">5</td><td>Grows with the account ($340 now)</td><td class="neg">All but $300</td></tr>
+<tr><td style="color:var(--gold)">BANK HALF — half of each win banked, half added</td><td class="n">7</td><td>Grows slowly ($300 now)</td><td class="pos">None</td></tr>
+<tr><td style="color:var(--blue)">PROFIT LOCKED — always $1,500, bank every win</td><td class="n">12</td><td>Always $300</td><td class="pos">None</td></tr>
+</tbody></table></div>
+<div class="rule"><b>Plan rule:</b> 2 contracts at <b>$7–10</b> (gold rows). Over $10 → <b>1 contract</b>. Max contracts below is the most you <i>can</i> buy, not what the plan says to buy.</div>
+
+<div class="wrap">
+<table>
+  <thead>
+    <tr><th></th><th class="grp r sepL" colspan="4">ALL IN</th><th class="grp g sepL" colspan="4">$300 BUFFER</th><th class="grp b sepL" colspan="4">PROFIT LOCKED</th></tr>
+    <tr>
+      <th>Price</th>
+      <th class="sepL">Max contracts</th><th>Cost</th><th>Loss at stop</th><th>Gain at TP</th>
+      <th class="sepL">Max contracts</th><th>Cost</th><th>Loss at stop</th><th>Gain at TP</th>
+      <th class="sepL">Max contracts</th><th>Cost</th><th>Loss at stop</th><th>Gain at TP</th>
+    </tr>
+  </thead>
+  <tbody id="tb"></tbody>
+</table>
+</div>
+<div class="foot">Fees not included (about $1–2.50 per contract each way). 0DTE can gap past a stop, so a real loss can be bigger than the "Loss at stop" column. Not financial advice.</div>
+
+<script>
+const ids=["bal","buf","prem","stop","tp"];
+try{const s=JSON.parse(localStorage.getItem("cs_v1")||"{}");ids.forEach(k=>{if(s[k]!=null)document.getElementById(k).value=s[k];});}catch(e){}
+const $=n=>"$"+Math.round(n).toLocaleString();
+function cells(money,p,stop,tp){
+  const n=Math.floor(money/(p*100)+1e-9);
+  if(n<1) return `<td class="n zero sepL">0</td><td class="zero">—</td><td class="zero">—</td><td class="zero">—</td>`;
+  const cost=n*p*100;
+  return `<td class="n sepL">${n}</td><td>${$(cost)}</td><td class="neg">−${$(cost*stop/100)}</td><td class="pos">+${$(cost*tp/100)}</td>`;
+}
+function render(){
+  const v={};ids.forEach(k=>v[k]=parseFloat(document.getElementById(k).value)||0);
+  try{localStorage.setItem("cs_v1",JSON.stringify(v));}catch(e){}
+  const A=v.bal, B=Math.max(0,v.bal-v.buf);
+  document.getElementById("sA").textContent=$(A);
+  document.getElementById("sB").textContent=$(B);
+  document.getElementById("sB2").textContent=`${$(v.buf)} never touched`;
+  const C=Math.min(v.prem,v.bal);
+  document.getElementById("sC").textContent=$(C);
+  document.getElementById("sC2").textContent=`${$(Math.max(0,v.bal-C))} profit banked, never touched`;
+  let h="";
+  for(let p=1;p<=20.0001;p+=0.5){
+    const plan=p>=7&&p<=10;
+    h+=`<tr class="${plan?"plan":""}"><td class="px">$${p.toFixed(2)}</td>${cells(A,p,v.stop,v.tp)}${cells(B,p,v.stop,v.tp)}${cells(C,p,v.stop,v.tp)}</tr>`;
+  }
+  document.getElementById("tb").innerHTML=h;
+}
+ids.forEach(k=>document.getElementById(k).addEventListener("input",render));
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VWAP and Stochastics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* same desk as Backtest Lab: slate, MBF purple, green/red only for direction */
+  --bg:#0f1117; --panel:#171a23; --panel2:#1e2230; --line:#2b3042; --ink:#e7e9f0; --muted:#9097ab;
+  --accent:#a66cff; --accent-soft:#2a2140; --win:#3fcf8e; --loss:#ff6b6b; --warn:#f2b84b; --blue:#5aa9ff;
+  --display:"IBM Plex Sans",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace; --math:"IBM Plex Serif",Georgia,serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--display);font-size:15px;line-height:1.5}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:1100px;margin:0 auto;padding:18px 18px 60px}
+h1{font-size:24px;margin:0 0 4px}
+h2{font-size:18px;margin:28px 0 8px;text-wrap:balance}
+h3{font-size:15px;margin:0 0 6px}
+p{margin:6px 0;max-width:72ch}
+.muted{color:var(--muted)}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
+.eq{font-family:var(--math);font-size:17px;background:var(--panel2);border-radius:8px;padding:10px 12px;margin:8px 0;overflow-x:auto;white-space:nowrap}
+.eq i{font-style:italic}
+.frac{display:inline-flex;flex-direction:column;vertical-align:middle;text-align:center;margin:0 4px}
+.frac>span:first-child{border-bottom:1px solid var(--ink);padding:0 4px}
+.frac>span:last-child{padding:0 4px}
+.controls{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:end;margin:10px 0}
+.controls label{display:grid;gap:3px;font-size:12px;color:var(--muted)}
+select,input[type=number]{background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:6px 8px}
+input[type=range]{accent-color:var(--accent);width:220px}
+.btn{background:var(--accent);color:#14091f;border:0;border-radius:8px;padding:8px 14px;font-weight:600;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+.chartbox{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px}
+canvas{display:block;width:100%;height:auto}
+.readout{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-top:8px}
+.ro{background:var(--panel2);border-radius:8px;padding:8px 10px}
+.ro .k{font-size:11px;color:var(--muted)}
+.ro .v{font-family:var(--mono);font-size:17px;font-weight:600;font-variant-numeric:tabular-nums}
+.pos{color:var(--win)} .neg{color:var(--loss)} .wrn{color:var(--warn)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:4px 2px}
+.legend i{display:inline-block;width:16px;height:3px;vertical-align:middle;margin-right:5px;border-radius:2px}
+.quiz{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
+.answer{margin-top:8px;padding:10px;border-left:3px solid var(--accent);background:var(--accent-soft);border-radius:0 8px 8px 0}
+ul{margin:6px 0;padding-left:20px} li{margin:3px 0;max-width:72ch}
+.hide{display:none}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>VWAP and Stochastics</h1>
+<p class="muted">The math, then a simulated SPX session you can scrub bar by bar. Make your call before you move the slider.</p>
+
+<h2>1 · VWAP: the volume-weighted mean price since the open</h2>
+<div class="grid2">
+<div class="card">
+  <h3>Definition</h3>
+  <p>Anchor at the session open, <i>t</i> = 0 (6:30 PT). With price <i>p</i>(τ) and volume rate <i>v</i>(τ):</p>
+  <div class="eq">VWAP(<i>t</i>) = <span class="frac"><span>∫<sub>0</sub><sup><i>t</i></sup> <i>p</i>(τ) <i>v</i>(τ) dτ</span><span>∫<sub>0</sub><sup><i>t</i></sup> <i>v</i>(τ) dτ</span></span> = <span class="frac"><span><i>N</i>(<i>t</i>)</span><span><i>V</i>(<i>t</i>)</span></span></div>
+  <p>On bars, each bar's price is its typical price <i>p<sub>i</sub></i> = (<i>H<sub>i</sub></i> + <i>L<sub>i</sub></i> + <i>C<sub>i</sub></i>)/3:</p>
+  <div class="eq">VWAP<sub><i>n</i></sub> = <span class="frac"><span>Σ<sub><i>i</i>≤<i>n</i></sub> <i>p<sub>i</sub> v<sub>i</sub></i></span><span>Σ<sub><i>i</i>≤<i>n</i></sub> <i>v<sub>i</sub></i></span></span></div>
+  <p>It's the first moment of the day's price distribution, weighted by volume: the average price every share traded at today.</p>
+</div>
+<div class="card">
+  <h3>It's a low-pass filter whose capacitor keeps growing</h3>
+  <p>Differentiate with the quotient rule (<i>N</i>′ = <i>pv</i>, <i>V</i>′ = <i>v</i>):</p>
+  <div class="eq"><span class="frac"><span>dVWAP</span><span>d<i>t</i></span></span> = <span class="frac"><span><i>v</i>(<i>t</i>)</span><span><i>V</i>(<i>t</i>)</span></span> · ( <i>p</i>(<i>t</i>) − VWAP(<i>t</i>) )</div>
+  <p>That's an RC circuit, <i>dy/dt</i> = (<i>x</i> − <i>y</i>)/τ, with a time constant that changes:</p>
+  <div class="eq">τ<sub>eff</sub>(<i>t</i>) = <i>V</i>(<i>t</i>) / <i>v</i>(<i>t</i>)</div>
+  <p>Early in the day <i>V</i> is small, so VWAP chases price. By noon <i>V</i> is huge and VWAP barely moves. A spike in <i>v</i> (news, the open) shrinks τ for a moment and pulls VWAP hard.</p>
+</div>
+<div class="card">
+  <h3>Bands: volume-weighted standard deviation</h3>
+  <div class="eq">σ<sup>2</sup><sub><i>n</i></sub> = <span class="frac"><span>Σ <i>v<sub>i</sub></i> (<i>p<sub>i</sub></i> − VWAP<sub><i>n</i></sub>)<sup>2</sup></span><span>Σ <i>v<sub>i</sub></i></span></span> = <span class="frac"><span>Σ <i>v<sub>i</sub> p<sub>i</sub></i><sup>2</sup></span><span>Σ <i>v<sub>i</sub></i></span></span> − VWAP<sub><i>n</i></sub><sup>2</sup></div>
+  <p>The second form needs only three running sums (Σ<i>v</i>, Σ<i>vp</i>, Σ<i>vp</i>²), which is how indicators compute it in O(1) per bar. The z-score <i>z</i> = (<i>p</i> − VWAP)/σ tells you how stretched price is.</p>
+</div>
+<div class="card">
+  <h3>How to use it in your system</h3>
+  <ul>
+    <li><b>Driver:</b> holding above VWAP after 6:45 = Up, holding below = Down, crossing = Mixed. It's one of the six drivers on your Game Plan.</li>
+    <li><b>Trend vs chop:</b> trend days rarely cross it (your 12:45 score uses fewer than 3 crosses). Chop days cross it again and again.</li>
+    <li><b>Pullback entries:</b> on a trend day, a pullback to VWAP or the ±1σ band that holds is a Leg 2 entry spot.</li>
+    <li><b>Stretch:</b> beyond ±2σ the move is extended. That's a take-profit zone, not an entry, unless a sweep and change of character print there.</li>
+    <li><b>Why it works:</b> institutions benchmark their fills against VWAP. Big buyers who need to get filled at or below it keep defending it on up days.</li>
+  </ul>
+</div>
+</div>
+
+<h2>2 · Stochastics: where the close sits in the recent range</h2>
+<div class="grid2">
+<div class="card">
+  <h3>Definition</h3>
+  <p>Over the last <i>n</i> bars (14 by default), with highest high <i>H<sub>n</sub></i> and lowest low <i>L<sub>n</sub></i>:</p>
+  <div class="eq">%<i>K</i> = 100 · <span class="frac"><span><i>C</i> − <i>L<sub>n</sub></i></span><span><i>H<sub>n</sub></i> − <i>L<sub>n</sub></i></span></span> ,&nbsp;&nbsp; %<i>D</i> = SMA<sub>3</sub>(%<i>K</i>)</div>
+  <p>It's min-max normalization of the close onto [0, 100]. "Slow" stochastics smooth %<i>K</i> with another 3-bar average first. Williams %R is the same quantity shifted: %<i>R</i> = %<i>K</i> − 100.</p>
+</div>
+<div class="card">
+  <h3>What it really measures</h3>
+  <p>Not speed, position. %<i>K</i> = 90 means the close is in the top 10% of the last <i>n</i> bars' range. It's bounded and scale-free, so it reads the same on SPX and on a $5 stock.</p>
+  <p>Edge cases worth knowing: when <i>H<sub>n</sub></i> − <i>L<sub>n</sub></i> is tiny (dead chop), small ticks swing it 0 → 100. And it jumps when an old extreme drops out of the window, even if price didn't move.</p>
+</div>
+<div class="card">
+  <h3>How to use it in your system</h3>
+  <ul>
+    <li><b>In a trend it pins.</b> On a down day %<i>K</i> sits under 20 for a long time. "Oversold" there is not a buy signal. Fading it is the same mistake as fading the open.</li>
+    <li><b>Entry timing with the trend:</b> on a down day, wait for %<i>K</i> to bounce above 50–80 on a pullback, then cross back down under %<i>D</i>. That's the pullback ending and Leg 2 starting.</li>
+    <li><b>Reversals:</b> divergence (new price low, higher %<i>K</i> low) at a data level plus a sweep and change of character. Stochastics alone never confirms a reversal.</li>
+  </ul>
+</div>
+</div>
+
+<h2>3 · Try it on a simulated session</h2>
+<p class="muted">A random SPX-like day with a U-shaped volume curve (heavy at the open and close). Volume candles: each candle is as wide as its volume, like your chart. Pick a day type, then scrub with the time slider. Hover a candle for exact values.</p>
+<div class="controls">
+  <label>Day type<select id="regime"><option value="up">Trend up</option><option value="down" selected>Trend down</option><option value="chop">Chop</option></select></label>
+  <label><span>Stochastic length n = <b id="nv">14</b></span><input type="range" id="n" min="5" max="40" value="14"></label>
+  <label>Candles<select id="tf"><option value="1">1 minute</option><option value="5" selected>5 minute</option></select></label>
+  <label>Bars on screen<select id="win"><option value="30">30</option><option value="45" selected>45</option><option value="80">80</option><option value="400">Whole day</option></select></label>
+  <label>Show<select id="bands"><option value="2">VWAP + ±1σ, ±2σ</option><option value="1">VWAP + ±1σ</option><option value="0">VWAP only</option></select></label>
+  <button class="btn ghost" id="newday">New random day</button>
+</div>
+<div class="controls"><label style="flex:1;min-width:240px"><span>Time: <b id="tv">6:30</b> PT</span><input type="range" id="t" min="5" max="389" value="60" style="width:100%"></label></div>
+<div class="chartbox">
+  <div class="legend"><span><i style="background:#7b3fe4"></i>Up candle</span><span><i style="background:#f39a2b"></i>Down candle</span><span>Width = volume</span><span><i style="background:#c9a4ff"></i>VWAP</span><span><i style="background:var(--blue)"></i>±1σ</span><span><i style="background:#5b6280"></i>±2σ</span><span><i style="background:var(--warn)"></i>%K</span><span><i style="background:var(--blue)"></i>%D</span></div>
+  <canvas id="cv" width="1060" height="560" aria-label="Simulated SPX session with VWAP, bands and stochastics"></canvas>
+</div>
+<div class="readout">
+  <div class="ro"><div class="k">Price</div><div class="v" id="r-p">–</div></div>
+  <div class="ro"><div class="k">VWAP</div><div class="v" id="r-v">–</div></div>
+  <div class="ro"><div class="k">z = (p − VWAP)/σ</div><div class="v" id="r-z">–</div></div>
+  <div class="ro"><div class="k">τ<sub>eff</sub> = V/v (minutes)</div><div class="v" id="r-tau">–</div></div>
+  <div class="ro"><div class="k">VWAP crosses so far</div><div class="v" id="r-x">–</div></div>
+  <div class="ro"><div class="k">%K / %D</div><div class="v" id="r-k">–</div></div>
+  <div class="ro"><div class="k">VWAP driver</div><div class="v" id="r-d">–</div></div>
+</div>
+<div class="card" style="margin-top:12px">
+  <h3>Call it before you scrub</h3>
+  <p class="muted">At the current time, which side does the data pick for the next hour? Commit, then move the slider forward an hour to check.</p>
+  <div class="quiz"><button class="btn ghost" data-call="up">Calls</button><button class="btn ghost" data-call="down">Puts</button><button class="btn ghost" data-call="wait">No side (wait)</button><span id="score" class="mono muted"></span></div>
+  <div id="qa" class="answer hide"></div>
+</div>
+</div>
+
+<script>
+const cv = document.getElementById("cv"), cx = cv.getContext("2d");
+const N = 390; let bars = [], seed = 7, calls = { right: 0, total: 0 }, pending = null;
+function rng() { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296; }
+function gauss() { let u = 0, v = 0; while (!u) u = rng(); while (!v) v = rng(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+function makeDay() {
+  const reg = document.getElementById("regime").value; bars = []; let p = 7400;
+  const drift = reg === "up" ? 0.22 : reg === "down" ? -0.26 : 0, mr = reg === "chop" ? 0.035 : 0.004;
+  let anchor = p;
+  for (let i = 0; i < N; i++) {
+    const u = i / (N - 1), vol = 0.35 + 2.6 * Math.pow(1 - u, 6) + 1.1 * Math.pow(u, 5) + 0.25 * rng();
+    const sig = 0.9 + 1.6 * Math.pow(1 - u, 4);
+    const pull = -mr * (p - anchor) + (reg === "chop" ? 0 : 0);
+    const step = drift * (0.6 + 0.8 * Math.sin(u * 9) ** 2) + pull + sig * gauss();
+    const o = p; p = p + step;
+    const h = Math.max(o, p) + Math.abs(gauss()) * sig * 0.6, l = Math.min(o, p) - Math.abs(gauss()) * sig * 0.6;
+    bars.push({ o, h, l, c: p, v: vol * 1e5 });
+  }
+  compute();
+}
+function compute() {
+  let sv = 0, svp = 0, svp2 = 0;
+  bars.forEach(b => { const tp = (b.h + b.l + b.c) / 3; sv += b.v; svp += b.v * tp; svp2 += b.v * tp * tp;
+    b.vw = svp / sv; b.sd = Math.sqrt(Math.max(svp2 / sv - b.vw * b.vw, 0)); b.tau = sv / b.v; });
+  draw();
+}
+function series(t) { /* aggregate 1m bars 0..t into the chosen timeframe, then stochastics + VWAP crosses on that series */
+  const tf = +document.getElementById("tf").value, n = +document.getElementById("n").value, out = [];
+  for (let i = 0; i <= t; i += tf) { const g = bars.slice(i, Math.min(i + tf, t + 1)), e = g[g.length - 1];
+    out.push({ i0: i, i1: i + g.length - 1, o: g[0].o, h: Math.max(...g.map(x => x.h)), l: Math.min(...g.map(x => x.l)), c: e.c, v: g.reduce((a, x) => a + x.v, 0), vw: e.vw, sd: e.sd, tau: e.tau }); }
+  let side = 0, cross = 0;
+  out.forEach((b, j) => { const w = out.slice(Math.max(0, j - n + 1), j + 1), H = Math.max(...w.map(x => x.h)), L = Math.min(...w.map(x => x.l));
+    b.k = H - L > 1e-9 ? 100 * (b.c - L) / (H - L) : 50; const kk = out.slice(Math.max(0, j - 2), j + 1); b.d = kk.reduce((a, x) => a + x.k, 0) / kk.length;
+    const sd = b.c > b.vw ? 1 : -1; if (b.i1 >= 15) { if (side && sd !== side) cross++; side = sd; } b.cross = cross; });
+  return out;
+}
+const tlabel = i => { const m = 390 + i; return Math.floor(m / 60) + ":" + String(m % 60).padStart(2, "0"); };
+let hover = null, geo = null;
+function draw() {
+  const t = +document.getElementById("t").value, W = cv.width, H = cv.height, padL = 64, padR = 14, top = 12, ph = 380, sTop = 420, sh = 120;
+  document.getElementById("tv").textContent = tlabel(t);
+  const all = series(t), win = +document.getElementById("win").value, vis = all.slice(Math.max(0, all.length - win)), bandN = +document.getElementById("bands").value;
+  cx.clearRect(0, 0, W, H); cx.font = "13px IBM Plex Mono, monospace";
+  let lo = Infinity, hi = -Infinity; vis.forEach(b => { lo = Math.min(lo, b.l, b.vw - bandN * b.sd); hi = Math.max(hi, b.h, b.vw + bandN * b.sd); });
+  const pad = (hi - lo) * 0.06 || 1; lo -= pad; hi += pad;
+  /* volume candles: each bar's width is proportional to its volume (equivolume) */
+  const plotW = W - padL - padR, gap = 2, vsum = vis.reduce((a, b) => a + b.v, 0), xs = []; let x = padL;
+  const slots = Math.max(vis.length, win), scale = (plotW - gap * slots) * (vis.length / slots) / vsum;
+  vis.forEach(b => { const w = Math.max(3, b.v * scale); xs.push([x, w]); x += w + gap; });
+  const Y = v => top + ph * (hi - v) / (hi - lo), YS = v => sTop + sh * (100 - v) / 100, XC = j => xs[j][0] + xs[j][1] / 2;
+  geo = { vis, xs };
+  cx.strokeStyle = "#252a3a"; cx.fillStyle = "#9097ab"; cx.lineWidth = 1;
+  for (let k = 0; k <= 5; k++) { const v = lo + (hi - lo) * k / 5, y = Y(v); cx.beginPath(); cx.moveTo(padL, y); cx.lineTo(W - padR, y); cx.stroke(); cx.fillText(v.toFixed(0), 8, y + 4); }
+  let lastLbl = -99; vis.forEach((b, j) => { if (b.i0 % 30 === 0 && XC(j) - lastLbl > 60) { cx.fillText(tlabel(b.i0), XC(j) - 16, H - 4); lastLbl = XC(j); } });
+  const path = (f, col, w, ys = Y, dash) => { cx.strokeStyle = col; cx.lineWidth = w; cx.setLineDash(dash || []); cx.beginPath(); vis.forEach((b, j) => { const y = ys(f(b)); j ? cx.lineTo(XC(j), y) : cx.moveTo(XC(j), y); }); cx.stroke(); cx.setLineDash([]); };
+  if (bandN >= 2) { path(b => b.vw + 2 * b.sd, "#5b6280", 1.5, Y, [5, 4]); path(b => b.vw - 2 * b.sd, "#5b6280", 1.5, Y, [5, 4]); }
+  if (bandN >= 1) { path(b => b.vw + b.sd, "#5aa9ff", 1.5); path(b => b.vw - b.sd, "#5aa9ff", 1.5); }
+  vis.forEach((b, j) => { const [x0, w] = xs[j], up = b.c >= b.o, col = up ? "#7b3fe4" : "#f39a2b";
+    cx.strokeStyle = col; cx.lineWidth = Math.max(1.5, Math.min(3, w / 6)); cx.beginPath(); cx.moveTo(x0 + w / 2, Y(b.h)); cx.lineTo(x0 + w / 2, Y(b.l)); cx.stroke();
+    const yt = Y(Math.max(b.o, b.c)), yb = Y(Math.min(b.o, b.c)); cx.fillStyle = col; cx.fillRect(x0, yt, w, Math.max(2, yb - yt));
+    cx.strokeStyle = "rgba(0,0,0,.45)"; cx.lineWidth = 1; cx.strokeRect(x0 + .5, yt + .5, w - 1, Math.max(2, yb - yt) - 1); });
+  path(b => b.vw, "#c9a4ff", 3);
+  cx.strokeStyle = "#252a3a"; [0, 20, 50, 80, 100].forEach(v => { const y = YS(v); cx.beginPath(); cx.moveTo(padL, y); cx.lineTo(W - padR, y); cx.stroke(); cx.fillStyle = "#9097ab"; cx.fillText(String(v), 26, y + 4); });
+  cx.fillStyle = "rgba(242,184,75,.07)"; cx.fillRect(padL, YS(100), plotW, YS(80) - YS(100)); cx.fillRect(padL, YS(20), plotW, YS(0) - YS(20));
+  path(b => b.k, "#f2b84b", 2, YS); path(b => b.d, "#5aa9ff", 2, YS);
+  let hj = vis.length - 1; if (hover !== null) { hj = xs.findIndex(([x0, w]) => hover >= x0 && hover <= x0 + w + gap); if (hj < 0) hj = vis.length - 1; }
+  const b = vis[hj]; cx.strokeStyle = "rgba(231,233,240,.4)"; cx.setLineDash([4, 4]); cx.beginPath(); cx.moveTo(XC(hj), top); cx.lineTo(XC(hj), sTop + sh); cx.stroke(); cx.setLineDash([]);
+  const z = b.sd > 0 ? (b.c - b.vw) / b.sd : 0;
+  document.getElementById("r-p").textContent = b.c.toFixed(2) + " @ " + tlabel(b.i1);
+  document.getElementById("r-v").textContent = b.vw.toFixed(2);
+  const rz = document.getElementById("r-z"); rz.textContent = (z >= 0 ? "+" : "") + z.toFixed(2); rz.className = "v " + (Math.abs(z) > 2 ? "wrn" : z > 0 ? "pos" : "neg");
+  document.getElementById("r-tau").textContent = b.tau.toFixed(0);
+  document.getElementById("r-x").textContent = b.cross;
+  document.getElementById("r-k").textContent = b.k.toFixed(0) + " / " + b.d.toFixed(0);
+  const seg = bars.slice(Math.max(15, b.i1 - 15), b.i1 + 1), above = seg.filter(x => x.c > x.vw).length / Math.max(seg.length, 1);
+  const rd = document.getElementById("r-d"); rd.textContent = b.i1 < 15 ? "Too early" : above > 0.85 ? "Up" : above < 0.15 ? "Down" : "Mixed"; rd.className = "v " + (rd.textContent === "Up" ? "pos" : rd.textContent === "Down" ? "neg" : "");
+}
+cv.addEventListener("mousemove", e => { const r = cv.getBoundingClientRect(); hover = (e.clientX - r.left) * cv.width / r.width; draw(); });
+cv.addEventListener("mouseleave", () => { hover = null; draw(); });
+document.getElementById("t").addEventListener("input", draw);
+document.getElementById("bands").addEventListener("change", draw);
+document.getElementById("n").addEventListener("input", e => { document.getElementById("nv").textContent = e.target.value; draw(); });
+document.getElementById("tf").addEventListener("change", draw); document.getElementById("win").addEventListener("change", draw);
+document.getElementById("regime").addEventListener("change", () => { seed = Math.floor(Math.random() * 1e9); makeDay(); });
+document.getElementById("newday").addEventListener("click", () => { seed = Math.floor(Math.random() * 1e9); document.getElementById("t").value = 60; makeDay(); });
+document.querySelectorAll("[data-call]").forEach(btn => btn.addEventListener("click", () => {
+  const t = +document.getElementById("t").value, end = Math.min(N - 1, t + 60), move = bars[end].c - bars[t].c;
+  const truth = Math.abs(move) < 6 ? "wait" : move > 0 ? "up" : "down", call = btn.dataset.call; calls.total++; if (call === truth) calls.right++;
+  const names = { up: "Calls", down: "Puts", wait: "No side" };
+  const b = bars[t], z = b.sd > 0 ? (b.c - b.vw) / b.sd : 0;
+  const qa = document.getElementById("qa"); qa.classList.remove("hide");
+  qa.innerHTML = `<b>${call === truth ? "Right." : "Not this time."}</b> Next hour (${tlabel(t)} → ${tlabel(end)}): SPX moved ${move >= 0 ? "+" : ""}${move.toFixed(1)} pts, so the answer was <b>${names[truth]}</b>. At ${tlabel(t)} price was ${z >= 0 ? "above" : "below"} VWAP (z ${z.toFixed(2)}), %K ${b.k.toFixed(0)}, ${b.cross} VWAP crosses so far. Move the slider to ${tlabel(end)} to see it.`;
+  document.getElementById("score").textContent = `${calls.right}/${calls.total} right`;
+}));
+makeDay();
+</script>
+</body>
+</html>
